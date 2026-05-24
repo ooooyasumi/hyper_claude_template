@@ -41,13 +41,12 @@ mkdir -p exports/VN/assets
 
 **默认音色：** `zh_female_vv_uranus_bigtts,zh_male_wennuanahu_uranus_bigtts`
 
-**模式选择：**
-- **短话题（<100 字）：** 直接用 `--prompt`，让 AI 自动生成对话
-- **长稿（>100 字）：** 压缩到 100 字以内再传 `--prompt`。提取核心要点（5-8 个），去掉细节和舞台指示。prompt 模式有 300 秒超时，太长会挂
-- **URL：** 用 `--url`，抓取网页内容转播客
+**模式选择（只用这两种，不要用 --text 或 --nlp-file）：**
+- **prompt 模式：** 直接用 `--prompt` 传话题内容（<1000 字全量传，>1000 字压缩到 1000 字以内）
+- **URL 模式：** 用 `--url` 传网页链接，抓取内容转播客
 
 ```bash
-# 方式 A：短话题生成（<100 字）
+# 方式 A：prompt 生成
 node scripts/volc_podcast_ws.mjs \
   --prompt "话题内容" \
   --speakers "zh_female_vv_uranus_bigtts,zh_male_wennuanahu_uranus_bigtts" \
@@ -60,21 +59,6 @@ node scripts/volc_podcast_ws.mjs \
   --speakers "zh_female_vv_uranus_bigtts,zh_male_wennuanahu_uranus_bigtts" \
   --head-music \
   --output exports/VN/assets/podcast_final.mp3
-
-# 方式 C：自定义对话（长稿必用）
-node scripts/volc_podcast_ws.mjs \
-  --nlp-file exports/VN/assets/dialogue.json \
-  --speakers "zh_female_vv_uranus_bigtts,zh_male_wennuanahu_uranus_bigtts" \
-  --head-music \
-  --output exports/VN/assets/podcast_final.mp3
-```
-
-**dialogue.json 格式：**
-```json
-[
-  {"speaker": "zh_female_vv_uranus_bigtts", "text": "女主播的台词"},
-  {"speaker": "zh_male_wennuanahu_uranus_bigtts", "text": "男嘉宾的台词"}
-]
 ```
 
 **TTS 完成后会打印 `audio_url=...`，保存此 URL 供 Step 2 使用。**
@@ -83,7 +67,7 @@ node scripts/volc_podcast_ws.mjs \
 - `--speech-rate N` — 语速（-10 ~ 10）
 - `--head-music` — 片头音乐（**始终加**）
 - `--tail-music` — 片尾音乐（**不要加**）
-- `--random-order` — 随机打乱说话人顺序（仅话题/文本模式有效）
+- `--random-order` — 随机打乱说话人顺序
 
 **完成条件：** `exports/VN/assets/podcast_final.mp3` 存在且 >0 字节，终端打印了 `audio_url`。
 
@@ -213,7 +197,6 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
 
 | 条件 | 跳过步骤 |
 |------|----------|
-| 用户给了 dialogue.json | 跳过 Step 1 的 prompt/url 生成，直接用 --nlp-file |
 | 用户给了音频文件 | 跳过 Step 1，直接 Step 2 |
 | 用户给了 transcript.json | 跳过 Step 2，直接 Step 3 |
 | 用户只要改视觉 | 跳过 Step 1-2，直接 Step 3-5 |
@@ -237,7 +220,6 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
 │           ├── podcast_final.mp3
 │           ├── transcript.json
 │           ├── transcript.txt
-│           ├── dialogue.json
 │           ├── prompt.txt
 │           └── scenes.json
 ├── project/               # HyperFrames 工作目录
@@ -273,19 +255,24 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
 
 ### 竖屏（1080×1920）
 
-字幕距底部 **280px**（不是最底下！），避免被短视频平台的信息栏（头像、点赞、评论、描述文字）遮挡。底部 250px 为安全留白区。
+字幕位于画面 **3/4 高度处**（距底部约 480px），即把竖屏画面四等分，字幕落在第三格（从上往下数）。这个位置在中轴线以下，视觉重心稳且不遮挡主要内容。
+
+**字体必须大！** 竖屏观看距离远、字号小了看不清。宁可多排几行（2-3 行都 OK），也要保证每行字号够大。只有在确实显示不全时才允许缩小，但底线是保证可读性。
+
+如果 ASR 回传的 `transcript.json` 中逐字时间戳足够精准（有 `words` 数组），应尽量将字幕按语义细分——每句话、每个逗号断句单独一行，而非整段堆在一起。
 
 ```css
 .caption-bar {
   position: absolute;
-  bottom: 280px;  /* 竖屏必须提高，避开平台 UI */
+  bottom: 480px;  /* 竖屏 3/4 高度处：1920 × 1/4 = 480 */
   left: 0; right: 0;
   padding: 0 40px;
   /* ... */
 }
 .caption-group {
-  font-size: 28px;  /* 竖屏字号稍大，保证可读性 */
-  line-height: 1.7;
+  font-size: 40px;  /* 竖屏字号必须大，保证远距离可读 */
+  line-height: 1.6;
+  letter-spacing: 0.02em;
 }
 
 /* 底部安全留白 — 不放任何内容 */
@@ -299,9 +286,10 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
 ```
 
 **竖屏额外注意事项：**
-- 场景内容 padding-bottom 加大到 **300px+**，避免正文和字幕重叠
-- 字号比横屏大 2-4px（竖屏观看距离更远）
-- 字幕最多显示 2 行，超过截断
+- 场景内容 padding-bottom 加大到 **550px+**，避免正文和字幕重叠
+- 字号基准 **40px**，只有显示不全时才缩小到 36px（不低于 34px）
+- 字幕允许 2-3 行，优先保证字号大而非行数少
+- 如果 ASR 有精确的 `words` 逐字时间戳，按语义断句细分字幕（逗号、句号、语气词处换行），而非整段一句话
 - progress bar 放在字幕上方，不是最底部
 
 ---
@@ -336,7 +324,38 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
 
 ### 动画规范
 
-**必须丰富多样，不要只用简单的 fade：**
+**核心原则：动画跟随内容关键点，不要匀速平铺！**
+
+动画应该在播客对话中的**关键信息点**触发——操作步骤、故事转折、建议、数据、对比、结论。不要每隔固定秒数硬塞动画，也不要整段画面一动不动。节奏是「静→动→静→动」的呼吸感，而不是匀速流水线。
+
+**动效节奏框架（以 30 秒为一个内容节奏单元）：**
+
+```
+[场景入场动画] → 静态停留(3-8s) → [关键点动画1] → 静态停留(3-8s) → [关键点动画2] → ...
+```
+
+- **场景入场：** 每个场景开始时必须有入场动画（轮换使用下方 5 种模式）
+- **关键点动画：** 只在内容真正有信息增量时触发——不是每个句子都需要动画
+- **静态停留：** 动画之间留足呼吸时间，让观众消化信息。一般 3-8 秒，信息密集段可以短一些（2-4 秒），叙述/铺垫段可以长一些（6-10 秒）
+- **场景收尾：** 最后 1-2 秒用淡出或静默过渡到下一场景
+
+**什么该触发动画，什么不该：**
+
+| 该动（有信息增量） | 不该动（铺垫/过渡） |
+|---|---|
+| 「第一步/第二步/…」→ 逐个展开 | 一般性寒暄、过渡语 |
+| 故事/经历的关键转折 | 重复强调已说过的内容 |
+| 强调某个核心概念 | 平铺直叙的背景介绍 |
+| 列举要点（3 个以上） | 单句普通陈述 |
+| 数据/数字出现 | 语气词、填充词 |
+| 两种方案对比 | 已经在讲同一观点的展开 |
+| 给出结论/建议 | |
+
+**分析 transcript.json 时要做的事：**
+1. 逐句扫描 utterances，标记所有关键信息点（步骤、建议、故事、数据、对比、结论）
+2. 只对标记了的关键信息点配动画，不要给每句话都加
+3. 动画类型要和内容语义匹配（步骤用逐个展开、对比用左右滑入、强调用缩放弹入、数据用数字跳动）
+4. 检查节奏：相邻两个动画之间至少间隔 2 秒，避免视觉碎片化
 
 | 动画类型 | 适用场景 | 示例 |
 |----------|----------|------|
@@ -348,6 +367,13 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
 | 逐个展开 | 时间线步骤 | 每隔 N 秒入场，配合内容播放时间 |
 | 弹性出场 | 结果/结论 | `ease: "back.out(2)"` |
 | 淡出 | 场景结束 | `opacity: 1 → 0, duration: 2.0` |
+| 高亮扫过 | 关键词强调 | marker sweep 效果，配合说话时机 |
+| 数字跳动 | 数据/统计 | 数字从 0 快速跳到目标值 |
+| 图标弹入 | 功能/操作提示 | `scale: 0 → 1.1 → 1, ease: "elastic.out(1, 0.5)"` |
+| 背景脉动 | 节奏转折点 | 背景色/光晕微妙变化，配合语气转折 |
+| 卡片翻转 | 观点切换 | `rotationY: 0 → 180`，正面→反面展示 |
+| 描边路径 | 步骤/流程 | SVG path 逐步描边，展示操作路径 |
+| 元素抖动 | 警告/注意 | `x: ±3, duration: 0.08, repeat: 3` |
 
 **场景入场动画模式（轮换使用，不要重复）：**
 1. 从下淡入（y + opacity）
@@ -355,6 +381,16 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
 3. 缩放淡入（scale + opacity）
 4. 旋转淡入（rotation + opacity，轻度 ±2°）
 5. 交错入场（stagger children）
+
+**关键点动画类型（按内容语义匹配）：**
+- 「第一步/第二步/…」→ 逐个展开动画，每步间隔 0.8-1.2 秒
+- 讲故事/经历的关键转折 → 卡片从侧面滑入，配合叙事节奏
+- 强调核心概念/关键词 → 高亮扫过 + 放大 + 颜色变化
+- 给建议/操作步骤 → 图标弹入 + 文字高亮
+- 列举要点（3+） → 列表项交错入场（stagger）
+- 数据/数字 → 数字跳动动画
+- 语气转折/重点句 → 背景脉动或装饰线展开
+- 对比两种方案 → 左右卡片同时滑入
 
 **GSAP 注意事项：**
 - `.clip` 元素的 visibility 由框架管理，GSAP 不要动画 visibility
@@ -374,20 +410,21 @@ cd project && npx hyperframes render --quality high --output ../exports/VN/podca
   <!-- 顶部标题区 -->
   <div class="top-header">...</div>
 
-  <!-- 场景内容区 — padding-bottom: 350px -->
+  <!-- 场景内容区 — padding-bottom: 550px（避开 3/4 处字幕区） -->
   <section class="scene clip" data-start="..." data-duration="...">
-    <div class="scene-content" style="padding: 100px 60px 350px;">
+    <div class="scene-content" style="padding: 100px 60px 550px;">
       <!-- 内容 -->
     </div>
   </section>
 
-  <!-- 字幕区 — bottom: 280px，不是最底下 -->
-  <div class="caption-bar" style="bottom: 280px; padding: 0 40px;">
+  <!-- 字幕区 — bottom: 480px（画面 3/4 高度处），字体必须大 -->
+  <div class="caption-bar" style="bottom: 480px; padding: 0 40px;">
     <div class="caption-group clip" data-start="..." data-duration="...">字幕文字</div>
   </div>
 
   <!-- 底部安全留白（不放任何内容） -->
   <!-- 最后 250px 是平台 UI 占位 -->
+  <!-- 字幕在 480px 处（画面 3/4），字体 40px，允许 2-3 行 -->
 </div>
 ```
 
@@ -424,10 +461,8 @@ VOLC_ASR_RESOURCE_ID=volc.seedasr.auc
 
 | 模式 | action | 参数 | 说明 |
 |------|--------|------|------|
-| 话题生成 | 4 | `--prompt` | 模型自动生成双人对话（仅短话题 <100 字） |
+| prompt | 4 | `--prompt` | 模型自动生成双人对话（<1000 字全量传，>1000 字压缩） |
 | URL | 0 | `--url` | 抓取网页内容，自动转播客 |
-| 文本 | 0 | `--text` | 长文本自动拆成对话 |
-| 自定义对话 | 3 | `--nlp-file` | 传入预写对话（**长稿必用**） |
 
 ### ASR（HTTP 轮询）
 
@@ -441,7 +476,7 @@ VOLC_ASR_RESOURCE_ID=volc.seedasr.auc
 
 ### TTS prompt 模式长文本超时
 
-`--prompt` 模式（action=4）长 prompt 处理时间远超 300 秒超时。**超过 100 字的稿子要压缩到 100 字以内再传 prompt，提取核心要点即可。**
+`--prompt` 模式（action=4）长 prompt 处理时间远超 300 秒超时。**超过 1000 字的稿子要压缩到 1000 字以内再传 prompt，提取核心要点即可。**
 
 ### HyperFrames timeline 必须注册
 
