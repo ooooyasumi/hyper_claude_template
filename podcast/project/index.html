@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Podcast</title>
+    <style>
+      /* @font-face 声明本地字体 */
+      /* :root 颜色变量 */
+      /* 场景布局样式 */
+      /* 字幕样式 */
+    </style>
+  </head>
+  <body>
+    <div data-composition-id="podcast" id="root" data-start="0" data-width="1920" data-height="1080" data-duration="0">
+
+      <!-- 音频轨道 -->
+      <audio
+        id="podcast-audio"
+        data-start="0"
+        data-track-index="2"
+        data-volume="1"
+        src="podcast_final.mp3"
+      ></audio>
+
+      <!-- 场景模板 -->
+      <section class="scene clip" id="scene-0" data-start="0" data-duration="0" data-track-index="1">
+        <div class="scene-content">
+          <!-- kicker / headline / support / cards -->
+        </div>
+      </section>
+
+      <!-- 字幕层 -->
+      <div class="subtitle-bar">
+        <!-- <div class="subtitle-text" id="sub-0">字幕文本</div> -->
+      </div>
+
+      <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+      <script>
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        // 场景动画 + 字幕动画
+        window.__timelines["podcast"] = tl;
+      </script>
+    </div>
+  </body>
+</html>

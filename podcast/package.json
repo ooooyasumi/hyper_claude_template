@@ -1,0 +1,15 @@
+{
+  "name": "ai-podcast",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "cd project && npx hyperframes lint",
+    "inspect": "cd project && npx hyperframes inspect",
+    "render:draft": "cd project && npx hyperframes render --quality draft",
+    "render:high": "cd project && npx hyperframes render --quality high",
+    "preview": "cd project && npx hyperframes preview"
+  },
+  "dependencies": {
+    "hyperframes": "latest"
+  }
+}
