@@ -1,47 +1,615 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Podcast</title>
-    <style>
-      /* @font-face 声明本地字体 */
-      /* :root 颜色变量 */
-      /* 场景布局样式 */
-      /* 字幕样式 */
-    </style>
-  </head>
-  <body>
-    <div data-composition-id="podcast" id="root" data-start="0" data-width="1920" data-height="1080" data-duration="0">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PODCAST_TITLE</title>
+<!--
+  ============================================================
+  苏米老师播客视频模板 — V3 定版
+  ============================================================
+  使用说明：
+  1. 全局替换 PODCAST_TITLE 为本期标题
+  2. 全局替换 PODCAST_DURATION 为音频时长（秒）
+  3. 根据 transcript.json 分析关键信息点，在 VISUAL ELEMENTS 区域填充视觉卡片
+  4. 运行 build_captions.mjs 生成字幕，替换 CAPTIONS 区域
+  5. 在 GSAP 区域为每个视觉元素编写入场动画
+  6. lint + inspect → render
 
-      <!-- 音频轨道 -->
-      <audio
-        id="podcast-audio"
-        data-start="0"
-        data-track-index="2"
-        data-volume="1"
-        src="podcast_final.mp3"
-      ></audio>
+  固定不可改：CSS 全部 / 装饰层 / 光球 / 脉冲环 / 浮动几何 / 边框 / 噪点
+  需要填充： 标题文字 / 场景标题 / 视觉卡片 / GSAP 动画触发点
+  脚本生成： 字幕（build_captions.mjs）
+  ============================================================
+-->
+<style>
+/* ============================================================
+   FIXED: CSS 设计系统 — 全部不可改
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-      <!-- 场景模板 -->
-      <section class="scene clip" id="scene-0" data-start="0" data-duration="0" data-track-index="1">
-        <div class="scene-content">
-          <!-- kicker / headline / support / cards -->
-        </div>
-      </section>
+[data-composition-id] {
+  position: relative; width: 1080px; height: 1920px;
+  background: #0D0B0E; overflow: hidden;
+}
 
-      <!-- 字幕层 -->
-      <div class="subtitle-bar">
-        <!-- <div class="subtitle-text" id="sub-0">字幕文本</div> -->
-      </div>
+[data-composition-id]::before {
+  content: ''; position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  opacity: 0.025; pointer-events: none; z-index: 100;
+}
 
-      <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
-      <script>
-        window.__timelines = window.__timelines || {};
-        const tl = gsap.timeline({ paused: true });
-        // 场景动画 + 字幕动画
-        window.__timelines["podcast"] = tl;
-      </script>
+[data-composition-id]::after {
+  content: ''; position: absolute;
+  top: 20%; left: 50%; transform: translate(-50%, -50%);
+  width: 900px; height: 900px;
+  background: radial-gradient(circle, rgba(201,169,110,0.06) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* --- CSS Keyframes --- */
+@keyframes pulse-ring {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.82); }
+  35%  { opacity: 0.6; }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(1.18); }
+}
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(15px, -20px) rotate(3deg); }
+  66% { transform: translate(-10px, 15px) rotate(-2deg); }
+}
+@keyframes float-rev {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-20px, -15px) rotate(-3deg); }
+}
+@keyframes dot-breathe {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.5); }
+}
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(200%); }
+}
+
+/* --- 页面边框 --- */
+.page-border-outer {
+  position: absolute; inset: 20px;
+  border: 1px solid rgba(201,169,110,0.15);
+  pointer-events: none; z-index: 90;
+}
+.page-border-inner {
+  position: absolute; inset: 28px;
+  border: 0.5px solid rgba(201,169,110,0.08);
+  pointer-events: none; z-index: 90;
+}
+.safe-bottom {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 240px; pointer-events: none; z-index: 0;
+}
+
+/* --- 装饰层 --- */
+.deco-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.pulse-ring {
+  position: absolute; border-radius: 50%;
+  border: 1.5px solid rgba(201,169,110,0.3);
+  animation: pulse-ring 2.5s ease-out both;
+  animation-play-state: paused;
+  pointer-events: none;
+}
+.pulse-ring.r1 { width: 200px; height: 200px; top: 15%; left: 25%; }
+.pulse-ring.r2 { width: 160px; height: 160px; top: 40%; right: 20%; }
+.pulse-ring.r3 { width: 240px; height: 240px; top: 25%; left: 60%; }
+.pulse-ring.r4 { width: 180px; height: 180px; top: 55%; left: 15%; }
+.pulse-ring.r5 { width: 140px; height: 140px; top: 65%; right: 30%; }
+
+.geo-deco {
+  position: absolute; opacity: 0.04;
+  animation: float-slow 12s ease-in-out infinite;
+  animation-play-state: paused;
+  pointer-events: none;
+}
+.geo-deco.g1 {
+  width: 120px; height: 120px; top: 8%; left: 8%;
+  border: 1px solid rgba(201,169,110,0.6); border-radius: 50%;
+}
+.geo-deco.g2 {
+  width: 0; height: 0; top: 35%; right: 15%;
+  border-left: 40px solid transparent; border-right: 40px solid transparent;
+  border-bottom: 70px solid rgba(116,140,171,0.3);
+  animation-name: float-rev; animation-duration: 16s;
+}
+.geo-deco.g3 {
+  width: 80px; height: 80px; top: 55%; left: 75%;
+  border: 1px solid rgba(201,169,110,0.4);
+  transform: rotate(45deg);
+}
+.geo-deco.g4 {
+  width: 60px; height: 60px; top: 20%; left: 55%;
+  background: rgba(107,142,107,0.2); border-radius: 50%;
+  animation-name: float-rev; animation-duration: 13s;
+}
+.geo-deco.g5 {
+  width: 4px; height: 4px; top: 70%; left: 40%;
+  background: rgba(201,169,110,0.5); border-radius: 50%;
+  box-shadow: 0 0 8px 2px rgba(201,169,110,0.4);
+}
+
+.ambient-orb { position: absolute; border-radius: 50%; pointer-events: none; z-index: 1; }
+.orb-a { width: 340px; height: 340px; top: 60px; right: -90px; background: radial-gradient(circle, rgba(116,140,171,0.10) 0%, transparent 70%); }
+.orb-b { width: 280px; height: 280px; top: 260px; left: -70px; background: radial-gradient(circle, rgba(201,169,110,0.08) 0%, transparent 70%); }
+.orb-c { width: 240px; height: 240px; top: 480px; right: 30px; background: radial-gradient(circle, rgba(107,142,107,0.06) 0%, transparent 70%); }
+.orb-d { width: 200px; height: 200px; top: 620px; left: 60px; background: radial-gradient(circle, rgba(168,92,92,0.05) 0%, transparent 70%); }
+
+/* --- Title --- */
+.title-scene {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; z-index: 10;
+}
+.title-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 100px 80px; position: relative;
+}
+.title-deco { position: absolute; width: 80px; height: 80px; }
+.title-deco.tl { top: 60px; left: 60px; border-top: 2px solid #C9A96E; border-left: 2px solid #C9A96E; }
+.title-deco.tr { top: 60px; right: 60px; border-top: 2px solid #C9A96E; border-right: 2px solid #C9A96E; }
+.title-deco.bl { bottom: 60px; left: 60px; border-bottom: 2px solid #C9A96E; border-left: 2px solid #C9A96E; }
+.title-deco.br { bottom: 60px; right: 60px; border-bottom: 2px solid #C9A96E; border-right: 2px solid #C9A96E; }
+.main-title {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 72px; font-weight: 700; color: #F0E6D3;
+  letter-spacing: 0.06em; line-height: 1.4; margin-bottom: 24px;
+}
+.subtitle {
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 38px; font-weight: 300; color: #C9A96E;
+  letter-spacing: 0.08em; margin-bottom: 40px;
+}
+.title-divider {
+  width: 200px; height: 1px;
+  background: linear-gradient(90deg, transparent, #C9A96E, transparent);
+  margin-bottom: 36px;
+}
+.account-id {
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 32px; color: #C9A96E; opacity: 0.7; letter-spacing: 0.1em;
+}
+
+/* --- Visual Stage --- */
+.visual-stage {
+  position: absolute; top: 60px; left: 60px; right: 60px;
+  height: 900px; z-index: 5; pointer-events: none;
+}
+.scene-header { position: absolute; top: 0; left: 0; right: 0; }
+.scene-title {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 48px; font-weight: 700; color: #C9A96E;
+  letter-spacing: 0.05em; line-height: 1.3; margin-bottom: 12px;
+}
+.scene-divider {
+  width: 100px; height: 2px;
+  background: linear-gradient(90deg, #C9A96E, transparent);
+}
+
+/* --- 关键词卡片 --- */
+.keyword-card {
+  position: absolute; top: 130px; left: 50%; transform: translateX(-50%);
+  padding: 28px 48px; background: rgba(13,11,14,0.9);
+  border: 1px solid rgba(201,169,110,0.25); border-radius: 12px; text-align: center;
+}
+.keyword-card .kw-main {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 52px; font-weight: 700; color: #F0E6D3; letter-spacing: 0.06em; display: block;
+}
+.keyword-card .kw-sub {
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 22px; font-weight: 300; color: #C9A96E; margin-top: 8px; letter-spacing: 0.04em;
+}
+
+/* --- 要点列表 --- */
+.bullet-list {
+  position: absolute; top: 120px; left: 40px; right: 40px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.bullet-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 14px 22px; background: rgba(13,11,14,0.85); border-radius: 10px;
+  border-left: 3px solid #C9A96E;
+}
+.bullet-num {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 30px; font-weight: 700; color: #C9A96E; min-width: 34px; line-height: 1;
+}
+.bullet-text {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 32px; font-weight: 600; color: #F0E6D3; letter-spacing: 0.03em; line-height: 1.5;
+}
+
+/* --- 数据大字报 --- */
+.data-burst {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; width: 100%;
+}
+.data-burst .data-num {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 130px; font-weight: 700; color: #C9A96E; line-height: 1; letter-spacing: -0.02em;
+}
+.data-burst .data-label {
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 28px; font-weight: 300; color: #F0E6D3; margin-top: 12px; letter-spacing: 0.06em;
+}
+
+/* --- 对比双栏 --- */
+.comparison-row {
+  position: absolute; top: 130px; left: 20px; right: 20px;
+  display: flex; gap: 20px; justify-content: center;
+}
+.comparison-col {
+  flex: 1; max-width: 420px; padding: 34px 26px; border-radius: 12px; text-align: center;
+}
+.comparison-col.left  { background: rgba(13,11,14,0.85); border: 1px solid rgba(168,92,92,0.3); }
+.comparison-col.right { background: rgba(13,11,14,0.85); border: 1px solid rgba(107,142,107,0.3); }
+.comparison-col .comp-label {
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 20px; color: #748CAB; letter-spacing: 0.08em; margin-bottom: 12px;
+}
+.comparison-col .comp-title {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 36px; font-weight: 700; color: #F0E6D3; letter-spacing: 0.04em;
+}
+
+/* --- 流程步骤 --- */
+.process-row {
+  position: absolute; top: 140px; left: 20px; right: 20px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.process-step {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; width: 150px;
+}
+.process-step .step-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(201,169,110,0.12); border: 2px solid rgba(201,169,110,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Playfair Display', serif;
+  font-size: 24px; font-weight: 700; color: #C9A96E; margin-bottom: 10px;
+}
+.process-step .step-label {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 26px; font-weight: 600; color: #F0E6D3; letter-spacing: 0.03em;
+}
+.process-step .step-desc {
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 17px; color: #748CAB; margin-top: 2px;
+}
+.process-arrow {
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 24px; color: #C9A96E; margin: 0 4px; padding-bottom: 42px;
+}
+
+/* --- 概念标签 --- */
+.concept-tags {
+  position: absolute; top: 130px; left: 30px; right: 30px;
+  display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+}
+.concept-tag {
+  padding: 12px 26px; border-radius: 8px;
+  background: rgba(201,169,110,0.08); border: 1px solid rgba(201,169,110,0.2);
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 28px; font-weight: 600; color: #F0E6D3; letter-spacing: 0.03em;
+}
+
+/* --- 提问卡片 --- */
+.question-card {
+  position: absolute; top: 120px; left: 50px; right: 50px;
+  padding: 34px 40px; background: rgba(13,11,14,0.88);
+  border: 1px solid rgba(201,169,110,0.3); border-radius: 16px; text-align: center;
+}
+.question-card .q-mark {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px; color: #C9A96E; line-height: 1;
+}
+.question-card .q-text {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 36px; font-weight: 600; color: #F0E6D3;
+  letter-spacing: 0.04em; line-height: 1.5; margin-top: 10px;
+}
+
+/* --- 强调文字 --- */
+.emphasis-text {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; width: 100%;
+}
+.emphasis-text .em-main {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 50px; font-weight: 700; color: #F0E6D3;
+  letter-spacing: 0.05em; line-height: 1.4;
+}
+.emphasis-text .em-sub {
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 24px; font-weight: 300; color: #748CAB;
+  margin-top: 12px; letter-spacing: 0.05em;
+}
+
+/* --- 几何装饰点 --- */
+.geo-dot {
+  position: absolute; width: 8px; height: 8px;
+  background: rgba(201,169,110,0.5); border-radius: 50%;
+  animation: dot-breathe 3s ease-in-out infinite;
+  animation-play-state: paused;
+  pointer-events: none;
+}
+
+/* --- 字幕 --- */
+.caption-stage {
+  position: absolute; bottom: 480px; left: 120px; right: 120px;
+  height: 340px; z-index: 50;
+}
+.caption-item {
+  position: absolute; bottom: 30px; left: 0; right: 0;
+  text-align: center; opacity: 0;
+}
+.caption-item[data-speaker="sumi"] .caption-text { color: #C9A96E; }
+.caption-item[data-speaker="guest"] .caption-text { color: #748CAB; }
+.caption-text {
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+  font-size: 42px; font-weight: 700;
+  line-height: 1.6; letter-spacing: 0.03em;
+}
+
+.speaker-dot {
+  position: absolute; bottom: 520px; left: 50%; transform: translateX(-50%);
+  width: 8px; height: 8px; border-radius: 50%;
+  transition: background-color 0.3s;
+  z-index: 51;
+}
+
+audio { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; }
+</style>
+</head>
+<body>
+<!--
+  FIXED: 数据属性 — 音频时长按实际替换 PODCAST_DURATION
+-->
+<div data-composition-id="podcast" data-width="1080" data-height="1920" data-start="0" data-duration="PODCAST_DURATION">
+
+<audio id="podcast-audio" src="AUDIO_PATH" data-composition-audio data-start="0" data-duration="PODCAST_DURATION"></audio>
+<div class="page-border-outer"></div>
+<div class="page-border-inner"></div>
+<div class="safe-bottom"></div>
+
+<!-- ============================================================
+     FIXED: 装饰层 — 全部不可改
+     ============================================================ -->
+<div class="deco-layer">
+  <div class="pulse-ring r1"></div><div class="pulse-ring r2"></div>
+  <div class="pulse-ring r3"></div><div class="pulse-ring r4"></div>
+  <div class="pulse-ring r5"></div>
+  <div class="geo-deco g1"></div><div class="geo-deco g2"></div>
+  <div class="geo-deco g3"></div><div class="geo-deco g4"></div>
+  <div class="geo-deco g5"></div>
+</div>
+
+<div class="ambient-orb orb-a"></div>
+<div class="ambient-orb orb-b"></div>
+<div class="ambient-orb orb-c"></div>
+<div class="ambient-orb orb-d"></div>
+
+<!-- FIXED: 说话人指示点 -->
+<div class="speaker-dot"></div>
+
+<!-- ============================================================
+     FIXED: 视觉内容区框架
+     FILL:  根据本期 transcript 分析关键信息点，填充视觉卡片
+             密度：平均 2-3 秒一个元素，最长不超过 8 秒空白
+             轮换类型：keyword-card / emphasis-text / comparison-row /
+                       data-burst / concept-tags / geo-dot /
+                       bullet-list / question-card / process-row
+     ============================================================ -->
+<div class="visual-stage">
+
+  <!-- FILL: Title 场景 — 替换标题和副标题 -->
+  <section class="title-scene clip" data-start="0" data-duration="TITLE_DURATION">
+    <div class="title-screen">
+      <div class="title-deco tl"></div><div class="title-deco tr"></div>
+      <div class="title-deco bl"></div><div class="title-deco br"></div>
+      <h1 class="main-title">本期主标题</h1>
+      <p class="subtitle">副标题/关键词</p>
+      <div class="title-divider"></div>
+      <p class="account-id">苏米老师</p>
     </div>
-  </body>
+  </section>
+
+  <!--
+    FILL: 场景标题 — 每个场景一个 scene-header
+    示例：
+    <div class="scene-header clip" data-start="7.3" data-duration="175">
+      <h2 class="scene-title">场景标题文字</h2>
+      <div class="scene-divider"></div>
+    </div>
+  -->
+
+  <!--
+    FILL: 视觉卡片 — 在关键信息点插入对应类型的卡片
+    每种类型的示例：
+
+    keyword-card（关键概念）:
+    <div class="keyword-card clip" data-start="14.3" data-duration="6">
+      <span class="kw-main">核心关键词</span>
+      <span class="kw-sub">副标题说明</span>
+    </div>
+
+    bullet-list（并列要点，3条）:
+    <div class="bullet-list clip" data-start="68.0" data-duration="10">
+      <div class="bullet-item"><span class="bullet-num">01</span><span class="bullet-text">要点一</span></div>
+      <div class="bullet-item"><span class="bullet-num">02</span><span class="bullet-text">要点二</span></div>
+      <div class="bullet-item"><span class="bullet-num">03</span><span class="bullet-text">要点三</span></div>
+    </div>
+
+    data-burst（数据大字报）:
+    <div class="data-burst clip" data-start="378.3" data-duration="6">
+      <div class="data-num">&gt;50%</div>
+      <div class="data-label">说明文字</div>
+    </div>
+
+    comparison-row（对比双栏）:
+    <div class="comparison-row clip" data-start="51.3" data-duration="8">
+      <div class="comparison-col left"><div class="comp-label">过 去</div><div class="comp-title">A</div></div>
+      <div class="comparison-col right"><div class="comp-label">现 在</div><div class="comp-title">B</div></div>
+    </div>
+
+    process-row（流程步骤）:
+    <div class="process-row clip" data-start="201.7" data-duration="10">
+      <div class="process-step"><div class="step-icon">1</div><div class="step-label">步骤一</div></div>
+      <span class="process-arrow">→</span>
+      <div class="process-step"><div class="step-icon">2</div><div class="step-label">步骤二</div></div>
+      <span class="process-arrow">→</span>
+      <div class="process-step"><div class="step-icon">3</div><div class="step-label">步骤三</div></div>
+    </div>
+
+    concept-tags（概念标签组，3个）:
+    <div class="concept-tags clip" data-start="97.3" data-duration="6">
+      <span class="concept-tag">标签1</span><span class="concept-tag">标签2</span><span class="concept-tag">标签3</span>
+    </div>
+
+    question-card（提问卡片）:
+    <div class="question-card clip" data-start="31.3" data-duration="10">
+      <div class="q-mark">?</div>
+      <div class="q-text">问题文字<br>可以换行</div>
+    </div>
+
+    emphasis-text（强调金句）:
+    <div class="emphasis-text clip" data-start="43.2" data-duration="6">
+      <div class="em-main">核心金句</div>
+      <div class="em-sub">补充说明</div>
+    </div>
+
+    geo-dot（装饰点，2-3个一组）:
+    <div class="geo-dot clip" data-start="20.3" data-duration="4" style="top:180px;left:120px;"></div>
+    <div class="geo-dot clip" data-start="20.3" data-duration="4" style="top:180px;right:120px;"></div>
+  -->
+
+</div>
+
+<!-- ============================================================
+     FILL: 字幕区 — 由 build_captions.mjs 脚本生成，不要手写
+     运行: node build_captions.mjs
+     输入: exports/VN/assets/transcript.json
+     输出: 替换下方整个 caption-stage 内容
+     ============================================================ -->
+<div class="caption-stage" data-layout-allow-overflow">
+  <!-- CAPTIONS_PLACEHOLDER: 运行 build_captions.mjs 后替换此区域 -->
+  <div class="caption-item clip" data-start="0.0" data-duration="1.0" data-speaker="sumi"><span class="caption-text">PLACEHOLDER</span></div>
+</div>
+
+</div>
+
+<!-- ============================================================
+     FIXED: GSAP 时间线框架
+     FILL:  为本期视觉元素编写入场动画
+     ============================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script>
+(function() {
+  const tl = gsap.timeline({ paused: true });
+
+  // --- FIXED: Title 动画 ---
+  tl.from(".main-title", { y: 60, opacity: 0, duration: 1.2, ease: "expo.out" }, 0.3);
+  tl.from(".subtitle", { y: 40, opacity: 0, duration: 1.0, ease: "expo.out" }, 0.8);
+  tl.from(".title-divider", { scaleX: 0, opacity: 0, duration: 0.8, ease: "power2.inOut" }, 1.2);
+  tl.from(".account-id", { y: 20, opacity: 0, duration: 0.8, ease: "expo.out" }, 1.6);
+  tl.from(".title-deco.tl", { x: -30, opacity: 0, duration: 0.6 }, 0.5);
+  tl.from(".title-deco.tr", { x: 30, opacity: 0, duration: 0.6 }, 0.5);
+  tl.from(".title-deco.bl", { x: -30, opacity: 0, duration: 0.6 }, 0.7);
+  tl.from(".title-deco.br", { x: 30, opacity: 0, duration: 0.6 }, 0.7);
+  tl.to(".title-scene", { opacity: 0, duration: 1.5, ease: "power2.in" }, "TITLE_FADE_START");
+
+  // --- FIXED: 脉冲环触发 — 在关键时间点激活 ---
+  function pulseRing(sel, ts) {
+    var el = document.querySelector(sel);
+    if (!el) return;
+    tl.set(el, { animationPlayState: "running" }, ts);
+    tl.set(el, { animationPlayState: "paused" }, ts + 2.5);
+  }
+  // FILL: pulseRing(".pulse-ring.r1", TIME);
+  // ... 在关键场景切换/情绪转折点触发各脉冲环
+
+  // --- FIXED: 装饰几何体持续浮动 ---
+  tl.set(".geo-deco", { animationPlayState: "running" }, "TITLE_END_TIME");
+
+  // --- FILL: 场景标题入场 ---
+  // [SCENE_START_TIMES].forEach(function(ts) {
+  //   tl.from('[data-start="'+ts+'"].scene-header .scene-title',
+  //     { y: 50, opacity: 0, duration: 0.8, ease: "expo.out" }, ts);
+  //   tl.from('[data-start="'+ts+'"].scene-header .scene-divider',
+  //     { scaleX: 0, duration: 0.6, ease: "power2.inOut" }, ts + 0.5);
+  // });
+
+  // --- FIXED: GSAP 动画辅助函数 — 全部可用，按需调用 ---
+  function cardIn(sel, ts) {
+    tl.from(sel, { scale: 0.88, opacity: 0, duration: 0.65, ease: "back.out(1.5)" }, ts);
+  }
+  function slideUp(sel, ts) {
+    tl.from(sel, { y: 50, opacity: 0, duration: 0.6, ease: "expo.out" }, ts);
+  }
+  function burstIn(sel, ts) {
+    tl.from(sel, { scale: 0.3, opacity: 0, duration: 0.9, ease: "back.out(2.5)" }, ts);
+  }
+  function emIn(sel, ts) {
+    tl.from(sel + ' .em-main', { y: 30, opacity: 0, duration: 0.55, ease: "expo.out" }, ts);
+    tl.from(sel + ' .em-sub', { y: 15, opacity: 0, duration: 0.45, ease: "expo.out" }, ts + 0.2);
+  }
+  function dotsPop(sel, ts) {
+    var dots = document.querySelectorAll(sel);
+    dots.forEach(function(d, i) {
+      tl.from(d, { scale: 0, opacity: 0, duration: 0.4, ease: "back.out(2)" }, ts + i * 0.12);
+      tl.set(d, { animationPlayState: "running" }, ts + i * 0.12);
+    });
+  }
+
+  // --- FILL: 视觉元素动画 — 每个视觉卡片都需要一个入场动画 ---
+  // 根据元素类型选择对应的函数：
+  //   keyword-card / concept-tag     → cardIn(selector, time)
+  //   emphasis-text                  → emIn(selector, time)
+  //   data-burst .data-num/.data-label → burstIn(selector, time)
+  //   keyword-card (普通)            → slideUp(selector, time)
+  //   geo-dot 组                     → dotsPop(selector, time)
+  //   comparison-col.left            → tl.from(sel, { x: -70, opacity: 0, ... }, time)
+  //   comparison-col.right           → tl.from(sel, { x: 70, opacity: 0, ... }, time + 0.2)
+  //   process-step                   → tl.from(sel, { scale: 0.6, opacity: 0, ... }, time + i*0.5)
+  //   bullet-item                    → tl.from(sel, { x: -30, opacity: 0, ... }, time + i*0.7)
+  //
+  // 轮换规则：不要连续 3 次使用同一种动画类型
+  // 密度要求：平均 2-3 秒一个动画触发
+
+  // --- FIXED: 字幕入场 — 所有 .caption-item 的 opacity 动画 ---
+  document.querySelectorAll('.caption-item[data-start]').forEach(function(el) {
+    var t = parseFloat(el.getAttribute('data-start'));
+    tl.to(el, { opacity: 1, duration: 0.2, ease: "power2.out" }, t);
+  });
+
+  // --- FIXED: 说话人指示点变色 ---
+  document.querySelectorAll('.caption-item[data-start]').forEach(function(el) {
+    var t = parseFloat(el.getAttribute('data-start'));
+    var sp = el.getAttribute('data-speaker');
+    var color = sp === 'sumi' ? '#C9A96E' : '#748CAB';
+    tl.to(".speaker-dot", { backgroundColor: color, duration: 0.3, ease: "power2.out" }, t);
+  });
+
+  // --- FIXED: 环境光球持续运动 ---
+  tl.to(".orb-a", { y: -50, x: 15, duration: 18, ease: "sine.inOut", yoyo: true, repeat: "ORB_A_REPEAT" }, 0);
+  tl.to(".orb-b", { y: 35, x: -10, duration: 22, ease: "sine.inOut", yoyo: true, repeat: "ORB_B_REPEAT" }, 0);
+  tl.to(".orb-c", { x: -30, y: 15, duration: 20, ease: "sine.inOut", yoyo: true, repeat: "ORB_C_REPEAT" }, 0);
+  tl.to(".orb-d", { y: -40, x: 20, duration: 24, ease: "sine.inOut", yoyo: true, repeat: "ORB_D_REPEAT" }, 0);
+
+  // --- FIXED: 页面边框呼吸 ---
+  tl.to(".page-border-outer", { borderColor: "rgba(201,169,110,0.25)", duration: 6, ease: "sine.inOut", yoyo: true, repeat: "BORDER_REPEAT" }, 0);
+
+  // --- FILL: 结语淡出 ---
+  // tl.to('.scene-header[data-start="FINAL_SCENE_START"]', { opacity: 0, duration: 2.0, ease: "power2.in" }, FADE_TIME);
+
+  // --- FIXED: 注册 timeline（必须，不可删） ---
+  window.__timelines = window.__timelines || {};
+  window.__timelines["podcast"] = tl;
+})();
+</script>
+</body>
 </html>
